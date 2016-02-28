@@ -37,16 +37,54 @@ fn get_path(req : Request) -> Option<PathBuf> {
 
 
 fn to_system_path(path : PathBuf) -> PathBuf {
-    let cd_as_str = current_dir().unwrap().to_str().unwrap();
-    let as_str = path.to_str().unwrap();
-    cd_as_str.push(as_str[1..]);
-    return PathBuf::from( + slash_dropped);
+    let cd = current_dir().unwrap();
+    let cd_as_str : &str = cd.to_str().unwrap();
+    let as_str : &str = &path.to_str().unwrap();
+
+    return PathBuf::from(
+        format!("{}{}",
+            cd_as_str,
+            if path.has_root() && cd_as_str.ends_with("/") {
+                &as_str[1..]
+            } else {
+                as_str
+            }
+        ));
+}
+
+
+fn serve_path(path:PathBuf, res:Response) {
+    let lpath = to_system_path(path);
+    println!("Serving {}", lpath.to_str().unwrap());
+    if !lpath.exists() {
+        println!("Path does not exist");
+        res.send(b"Could not find path");
+    } else if lpath.is_dir() {
+        server_dir(lpath, res);
+    } else if lpath.is_file() {
+        serve_doc(lpath, res);
+    } else {
+        println!("Unexpected error, path exists but is neither file nor directory.");
+    }
+}
+
+
+fn server_dir(path:PathBuf, res:Response) {
+    let message = path.read_dir().unwrap().fold(String::new(), |acc, item| {
+        let p = item.unwrap().path();
+        let itemstr : &str = p.to_str().unwrap();
+        if acc.is_empty() {
+            return acc + itemstr;
+        } else {
+            return acc + "\n" + itemstr;
+        }
+    });
+    res.send(message.as_bytes());
 }
 
 
 fn serve_doc(path:PathBuf, res:Response) {
-    let lpath = path.relative_from("/");
-    let mut fp = match File::open(lpath) {
+    let mut fp = match File::open(path) {
         Ok(fp) => fp,
         Err(_) => {
             println!("File not found!");
@@ -70,6 +108,6 @@ fn handler(req: Request, res: Response) {
     println!("{:?}", req.uri);
     get_path(req).map(|path| {
         println!("Recieved request for {}", path.to_str().unwrap());
-        return serve_doc(path, res);
+        return serve_path(path, res);
     });
 }
