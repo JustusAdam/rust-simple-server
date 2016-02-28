@@ -1,0 +1,9 @@
+[package]
+name = "simple-server"
+version = "0.1.0"
+authors = ["Justus Adam <dev@justus.science>"]
+
+
+[dependencies]
+hyper = "0.7.2"
+argparse = "0.2.1"
